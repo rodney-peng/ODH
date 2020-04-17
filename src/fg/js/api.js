@@ -22,10 +22,19 @@ async function getTranslation(expression){
     }
 }
 
-async  function addNote(notedef){
+async function addNote(notedef){
     try {
         return await sendtoBackend({action:'addNote',params:{notedef}});
     } catch (err) {
         return null;
     }
 }
+
+async function consoleLog(logmsg){
+    try {
+        return await sendtoBackend({action:'consoleLog',params:{logmsg}});
+    } catch (err) {
+        return null;
+    }
+}
+

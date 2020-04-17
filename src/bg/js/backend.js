@@ -96,11 +96,18 @@ class ODHBack {
         let fieldnames = ['expression', 'reading', 'extrainfo', 'definition', 'definitions', 'sentence', 'url'];
         for (const fieldname of fieldnames) {
             if (!options[fieldname]) continue;
-            note.fields[options[fieldname]] = notedef[fieldname];
+
+            let ankiField = options[fieldname];
+            if (note.fields[ankiField])
+                note.fields[ankiField] += '<hr>';
+            else
+                note.fields[ankiField] = "";
+            note.fields[ankiField] += this.formatField(fieldname, notedef[fieldname]);
         }
 
         if (options.audio && notedef.audios.length > 0) {
-            note.fields[options.audio] = '';
+            // If Audio is set to "Front" or "Term", this will clear the field and fail addNote of AnkiConnect.
+            //note.fields[options.audio] = '';
             let audionumber = Number(options.preferredaudio);
             audionumber = (audionumber && notedef.audios[audionumber]) ? audionumber : 0;
             let audiofile = notedef.audios[audionumber];
@@ -112,6 +119,11 @@ class ODHBack {
         }
 
         return note;
+    }
+
+    formatField(type, value) {
+        if (type == 'url') return `<a href="${value}">${value}</a>`;
+        return value;
     }
 
     // Message Hub and Handler start from here ...
@@ -186,6 +198,7 @@ class ODHBack {
 
     async api_getTranslation(params) {
         let { expression, callback } = params;
+//console.log('bg/backend:api_getTranslation() expression: ' + expression);
 
         // Fix https://github.com/ninja33/ODH/issues/97
         if (expression.endsWith(".")) {
@@ -194,6 +207,8 @@ class ODHBack {
 
         try {
             let result = await this.findTerm(expression);
+//console.log('bg/backend:api_getTranslation() length(result): ' + result.length);
+//console.log('bg/backend:api_getTranslation() result: ' + JSON.stringify(result));
             callback(result);
         } catch (err) {
             console.error(err);
@@ -204,7 +219,9 @@ class ODHBack {
     async api_addNote(params) {
         let { notedef, callback } = params;
 
+//console.log('bg/backend:api_addNote() notedef: ' + JSON.stringify(notedef));
         const note = this.formatNote(notedef);
+//console.log('bg/backend:api_addNote() note: ' + JSON.stringify(note));
         try {
             let result = await this.target.addNote(note);
             callback(result);
@@ -297,7 +314,11 @@ class ODHBack {
         this.agent.postMessage('callback', { data, callbackId });
     }
 
-
+    async api_consoleLog(params) {
+        let { logmsg } = params;
+        console.log( logmsg );
+    }
 }
 
 window.odhback = new ODHBack();
+

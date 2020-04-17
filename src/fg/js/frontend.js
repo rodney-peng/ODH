@@ -96,6 +96,7 @@ class ODHFront {
         // reset selection timeout
         this.timeout = null;
         const expression = selectedText();
+        //consoleLog( "fg/frontend:onSelectionEnd() expression: " + expression );
         if (isEmpty(expression)) return;
 
         let result = await getTranslation(expression);
@@ -140,7 +141,8 @@ class ODHFront {
 
         let notedef = Object.assign({}, this.notes[nindex]);
         notedef.definition = this.notes[nindex].css + this.notes[nindex].definitions[dindex];
-        notedef.definitions = this.notes[nindex].css + this.notes[nindex].definitions.join('<hr>');
+        notedef.definitions = this.allDefinitions(this.notes);
+        // notedef.definitions = this.notes[nindex].css + this.notes[nindex].definitions.join('<hr>');
         notedef.sentence = context;
         notedef.url = window.location.href;
         let response = await addNote(notedef);
@@ -186,6 +188,7 @@ class ODHFront {
             expression,
             reading: '',
             extrainfo: '',
+            dictionary: '',
             definitions: '',
             sentence,
             url: '',
@@ -205,6 +208,25 @@ class ODHFront {
             return [tmpl];
         }
 
+    }
+
+    allDefinitions(notes) {
+        let content = '';
+
+        if (notes && notes[0]['dictionary']) content += `<span>${notes[0]['dictionary']}</span><br><br>`;
+
+        for (const [nindex, note] of notes.entries()) {
+            let index = nindex + 1;
+            content += `
+                    <span>${index}.</span>
+                    <span>${note.expression}</span>
+                    <span>${note.reading}</span>
+                    <span>${note.extrainfo}</span>
+                `;
+            content += '<br>' + note.css + note.definitions.join('<hr>') + '<hr><br>';
+        }
+
+        return content;
     }
 
     async renderPopup(notes) {

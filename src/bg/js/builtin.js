@@ -9,7 +9,7 @@ class Builtin {
 
     findTerm(dictname, term) {
         const dict = this.dicts[dictname];
-        return dict.hasOwnProperty(term) ? JSON.stringify(dict[term]):null;
+        return (dict && dict.hasOwnProperty(term)) ? JSON.stringify(dict[term]) : null;
     }
 
     static async loadData(path) {

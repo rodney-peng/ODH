@@ -44,10 +44,12 @@ class encn_Cambridge_tc {
             let parser = new DOMParser();
             doc = parser.parseFromString(data, 'text/html');
         } catch (err) {
+console.log( "cb_tc:findCambridge() failed to fetch: " + url );
             return [];
         }
 
         let entries = doc.querySelectorAll('.pr .entry-body__el') || [];
+//console.log( "cb_tc:findCambridge() entries: " + entries.length );
         for (const entry of entries) {
             let definitions = [];
             let audios = [];
@@ -60,8 +62,9 @@ class encn_Cambridge_tc {
                 let reading_us = T(readings[1]);
                 reading = (reading_uk || reading_us) ? `UK[${reading_uk}] US[${reading_us}] ` : '';
             }
+
             let pos = T(entry.querySelector('.posgram'));
-            pos = pos ? `<span class='pos'>${pos}</span>` : '';
+            pos = pos ? `<span class='pos'>${pos}</span><br>` : '';
             audios[0] = entry.querySelector(".uk.dpron-i source");
             audios[0] = audios[0] ? 'https://dictionary.cambridge.org' + audios[0].getAttribute('src') : '';
             //audios[0] = audios[0].replace('https', 'http');
@@ -70,11 +73,15 @@ class encn_Cambridge_tc {
             //audios[1] = audios[1].replace('https', 'http');
 
             let sensbodys = entry.querySelectorAll('.sense-body') || [];
+//console.log( "cb_tc:findCambridge() sensbodys: " + sensbodys.length );
             for (const sensbody of sensbodys) {
+                let defnum = 0;
                 let sensblocks = sensbody.childNodes || [];
+//console.log( "cb_tc:findCambridge() sensblocks: " + sensblocks.length );
                 for (const sensblock of sensblocks) {
                     let phrasehead = '';
                     let defblocks = [];
+
                     if (sensblock.classList && sensblock.classList.contains('phrase-block')) {
                         phrasehead = T(sensblock.querySelector('.phrase-title'));
                         phrasehead = phrasehead ? `<div class="phrasehead">${phrasehead}</div>` : '';
@@ -87,14 +94,17 @@ class encn_Cambridge_tc {
 
                     // make definition segement
                     for (const defblock of defblocks) {
+                        let definition = '';
+                        if (defnum == 0) definition += pos;
+                        if (phrasehead) definition += phrasehead;
+
                         let eng_tran = T(defblock.querySelector('.ddef_h .def'));
                         let chn_tran = T(defblock.querySelector('.def-body .trans'));
-                        if (!eng_tran) continue;
-                        let definition = '';
+                        if (!eng_tran) eng_tran = "";
                         eng_tran = `<span class='eng_tran'>${eng_tran.replace(RegExp(expression, 'gi'),`<b>${expression}</b>`)}</span>`;
                         chn_tran = `<span class='chn_tran'>${chn_tran}</span>`;
                         let tran = `<span class='tran'>${eng_tran}${chn_tran}</span>`;
-                        definition += phrasehead ? `${phrasehead}${tran}` : `${pos}${tran}`;
+                        definition += tran;
 
                         // make exmaple segement
                         let examps = defblock.querySelectorAll('.def-body .examp') || [];
@@ -108,15 +118,21 @@ class encn_Cambridge_tc {
                             }
                             definition += '</ul>';
                         }
-                        definition && definitions.push(definition);
+
+                        if (definition) {
+                            definitions.push(definition);
+                            defnum++;
+                        }
                     }
                 }
             }
+
             let css = this.renderCSS();
             notes.push({
                 css,
                 expression,
                 reading,
+                dictionary: 'Cambridge Dictionary',
                 definitions,
                 audios
             });
@@ -185,6 +201,7 @@ class encn_Cambridge_tc {
                 css,
                 expression,
                 reading,
+                dictionary: 'Youdao',
                 definitions: [definition],
                 audios
             });
