@@ -15,6 +15,7 @@ class ODHFront {
         this.popup = new Popup();
         this.timeout = null;
         this.mousemoved = false;
+        this.expression = null;
 
         window.addEventListener('mousemove', e => this.onMouseMove(e));
         window.addEventListener('mousedown', e => this.onMouseDown(e));
@@ -28,19 +29,29 @@ class ODHFront {
     }
 
     onKeyDown(e) {
-        if (!this.activateKey)
+        if (!this.enabled || !this.activateKey)
             return;
 
         if (!isValidElement())
             return;
 
-        if (this.enabled && this.point !== null && (e.keyCode === this.activateKey || e.charCode === this.activateKey)) {
-            const range = rangeFromPoint(this.point);
-            if (range == null) return;
-            let textSource = new TextSourceRange(range);
-            textSource.selectText();
+        if (e.keyCode === this.activateKey || e.charCode === this.activateKey) {
+            if (!this.expression && this.point !== null) {
+                //consoleLog( "Point: " + JSON.stringify(this.point) );
+                const range = rangeFromPoint(this.point);
+                if (range == null) return;
+                //consoleLog( "Range: " + JSON.stringify(range) );
+                let textSource = new TextSourceRange(range);
+                textSource.selectText();
+                this.onSelectionEnd(e);
+            }
+
             this.mousemoved = false;
-            this.onSelectionEnd(e);
+
+            if (this.expression !== null) {
+                this.lookupAndPopup(this.expression);
+                this.expression = null;
+            }
         }
 
         if (e.keyCode === this.exitKey || e.charCode === this.exitKey)
@@ -85,6 +96,23 @@ class ODHFront {
         }, 500);
     }
 
+    async lookupAndPopup(expression) {
+        // reset selection timeout
+        this.timeout = null;
+
+        let result = await getTranslation(expression);
+        if (result == null || result.length == 0) return;
+        this.notes = this.buildNote(result, expression);
+        this.popup.showNextTo({ x: this.point.x, y: this.point.y, }, await this.renderPopup(this.notes));
+    }
+
+    isValidExpression(expression) {
+        if (isEmpty(expression) || expression.length > 32) return false;
+        // don't lookup if more than two words
+        if (expression.split(" ").length > 2) return false;
+        return true;
+    }
+
     async onSelectionEnd(e) {
 
         if (!this.enabled)
@@ -93,17 +121,14 @@ class ODHFront {
         if (!isValidElement())
             return;
 
-        // reset selection timeout
-        this.timeout = null;
         const expression = selectedText();
         //consoleLog( "fg/frontend:onSelectionEnd() expression: " + expression );
-        if (isEmpty(expression)) return;
-
-        let result = await getTranslation(expression);
-        if (result == null || result.length == 0) return;
-        this.notes = this.buildNote(result);
-        this.popup.showNextTo({ x: this.point.x, y: this.point.y, }, await this.renderPopup(this.notes));
-
+        if (this.isValidExpression(expression)) {
+            this.expression = expression;
+            //consoleLog( "onSelectionEnd() expression: " + expression );
+        }
+        else
+            this.expression = null;
     }
 
     onBgMessage(request, sender, callback) {
@@ -178,9 +203,8 @@ class ODHFront {
         this.audio[url] = audio;
     }
 
-    buildNote(result) {
+    buildNote(result, expression) {
         //get 1 sentence around the expression.
-        const expression = selectedText();
         const sentence = getSentence(this.maxContext);
         this.sentence = sentence;
         let tmpl = {
