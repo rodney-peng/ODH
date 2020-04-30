@@ -25,6 +25,86 @@ class encn_Cambridge_tc {
         return [].concat(...results).filter(x => x);
     }
 
+    pushPosBody( expression, header, posbody, definitions ) {
+
+        function T(node) {
+            if (!node)
+                return '';
+            else
+                return node.innerText.trim();
+        }
+
+        let pr_dsenses = posbody.querySelectorAll('.pr .dsense') || [];
+//console.log( "cb_tc:pushPosBody() pr_dsenses: " + pr_dsenses.length );
+        for (const pr_dsense of pr_dsenses) {
+            let dsense_h = pr_dsense.querySelector('.dsense_h');
+            let sense_h = '';
+            if (dsense_h) sense_h = `<span class='dsense_h'>${dsense_h.textContent}</span><br>`;
+
+            let sensbodys = pr_dsense.querySelectorAll('.sense-body') || [];
+//console.log( "cb_tc:pushPosBody() sensbodys: " + sensbodys.length );
+            for (const sensbody of sensbodys) {
+                let sensblocks = sensbody.childNodes || [];
+//console.log( "cb_tc:pushPosBody() sensblocks: " + sensblocks.length );
+                for (const sensblock of sensblocks) {
+                    let phrasehead = '';
+                    let defblocks = [];
+
+                    if (sensblock.classList && sensblock.classList.contains('phrase-block')) {
+                        phrasehead = T(sensblock.querySelector('.phrase-title'));
+                        phrasehead = phrasehead ? `<div class="phrasehead">${phrasehead}</div>` : '';
+                        defblocks = sensblock.querySelectorAll('.def-block') || [];
+                    }
+                    if (sensblock.classList && sensblock.classList.contains('def-block')) {
+                        defblocks = [sensblock];
+                    }
+                    if (defblocks.length <= 0) continue;
+
+                    // make definition segement
+                    for (const defblock of defblocks) {
+                        let definition = '';
+
+                        if (header) { definition += header; header = ''; }
+                        if (sense_h) { definition += sense_h; sense_h = ''; }
+                        if (phrasehead) { definition += phrasehead; phrasehead = ''; };
+
+                        let def_info = T(defblock.querySelector('.def-info'));
+                        if (def_info) definition += `<span class='def-info'>${def_info}</span><br>`;
+
+                        let eng_tran = T(defblock.querySelector('.ddef_h .def'));
+                        let chn_tran = T(defblock.querySelector('.def-body .trans'));
+                        if (!eng_tran) eng_tran = "";
+                        let bold_exp = `<b>${expression}</b>`;
+                        eng_tran = `<span class='eng_tran'>${eng_tran.replace(RegExp(expression, 'gi'), bold_exp)}</span>`;
+                        chn_tran = `<span class='chn_tran'>${chn_tran}</span>`;
+                        let tran = `<span class='tran'>${eng_tran}${chn_tran}</span>`;
+                        definition += tran;
+
+                        // make exmaple segement
+                        let examps = defblock.querySelectorAll('.def-body .examp') || [];
+                        if (examps.length > 0 && this.maxexample > 0) {
+                            definition += '<ul class="sents">';
+                            for (const [index, examp] of examps.entries()) {
+                                if (index > this.maxexample - 1) break; // to control only 2 example sentence.
+                                let eng_examp = T(examp.querySelector('.eg'));
+                                let chn_examp = T(examp.querySelector('.trans'));
+                                definition += `<li class='sent'><span class='eng_sent'>
+                                    ${eng_examp.replace(RegExp(expression, 'gi'), bold_exp)}</span>
+                                    <span class='chn_sent'>${chn_examp}</span></li>`;
+                            }
+                            definition += '</ul>';
+                        }
+
+                        let xref = T(defblock.querySelector('.xref'));
+                        if (xref) definition += `<br><span class='xref'>${xref}</span><br>`;
+
+                        if (definition) definitions.push(definition);
+                    }
+                }
+            }
+        }
+    }
+
     async findCambridge(word) {
         let notes = [];
         if (!word) return notes; // return empty notes
@@ -52,7 +132,6 @@ console.log( "cb_tc:findCambridge() failed to fetch: " + url );
 //console.log( "cb_tc:findCambridge() entries: " + entries.length );
         for (const entry of entries) {
             let definitions = [];
-            let audios = [];
 
             let expression = T(entry.querySelector('.headword'));
             let reading = '';
@@ -63,69 +142,28 @@ console.log( "cb_tc:findCambridge() failed to fetch: " + url );
                 reading = (reading_uk || reading_us) ? `UK[${reading_uk}] US[${reading_us}] ` : '';
             }
 
-            let pos = T(entry.querySelector('.posgram'));
-            pos = pos ? `<span class='pos'>${pos}</span><br>` : '';
-            audios[0] = entry.querySelector(".uk.dpron-i source");
-            audios[0] = audios[0] ? 'https://dictionary.cambridge.org' + audios[0].getAttribute('src') : '';
-            //audios[0] = audios[0].replace('https', 'http');
-            audios[1] = entry.querySelector(".us.dpron-i source");
-            audios[1] = audios[1] ? 'https://dictionary.cambridge.org' + audios[1].getAttribute('src') : '';
-            //audios[1] = audios[1].replace('https', 'http');
+            let posheader = entry.querySelector('.pos-header');
+            let header = '';
+            let audios = [];
 
-            let sensbodys = entry.querySelectorAll('.sense-body') || [];
-//console.log( "cb_tc:findCambridge() sensbodys: " + sensbodys.length );
-            for (const sensbody of sensbodys) {
-                let defnum = 0;
-                let sensblocks = sensbody.childNodes || [];
-//console.log( "cb_tc:findCambridge() sensblocks: " + sensblocks.length );
-                for (const sensblock of sensblocks) {
-                    let phrasehead = '';
-                    let defblocks = [];
+            if (posheader) {
+                let posgram = T(posheader.querySelector('.posgram'));
+                let dvar = T(posheader.querySelector('.dvar'));
 
-                    if (sensblock.classList && sensblock.classList.contains('phrase-block')) {
-                        phrasehead = T(sensblock.querySelector('.phrase-title'));
-                        phrasehead = phrasehead ? `<div class="phrasehead">${phrasehead}</div>` : '';
-                        defblocks = sensblock.querySelectorAll('.def-block') || [];
-                    }
-                    if (sensblock.classList && sensblock.classList.contains('def-block')) {
-                        defblocks = [sensblock];
-                    }
-                    if (defblocks.length <= 0) continue;
+                if (posgram) header += `<span class='posgram'>${posgram}</span><br>`;
+                if (dvar) header += `<span class='dvar'>${dvar}</span><br>`;
 
-                    // make definition segement
-                    for (const defblock of defblocks) {
-                        let definition = '';
-                        if (defnum == 0) definition += pos;
-                        if (phrasehead) definition += phrasehead;
-
-                        let eng_tran = T(defblock.querySelector('.ddef_h .def'));
-                        let chn_tran = T(defblock.querySelector('.def-body .trans'));
-                        if (!eng_tran) eng_tran = "";
-                        eng_tran = `<span class='eng_tran'>${eng_tran.replace(RegExp(expression, 'gi'),`<b>${expression}</b>`)}</span>`;
-                        chn_tran = `<span class='chn_tran'>${chn_tran}</span>`;
-                        let tran = `<span class='tran'>${eng_tran}${chn_tran}</span>`;
-                        definition += tran;
-
-                        // make exmaple segement
-                        let examps = defblock.querySelectorAll('.def-body .examp') || [];
-                        if (examps.length > 0 && this.maxexample > 0) {
-                            definition += '<ul class="sents">';
-                            for (const [index, examp] of examps.entries()) {
-                                if (index > this.maxexample - 1) break; // to control only 2 example sentence.
-                                let eng_examp = T(examp.querySelector('.eg'));
-                                let chn_examp = T(examp.querySelector('.trans'));
-                                definition += `<li class='sent'><span class='eng_sent'>${eng_examp.replace(RegExp(expression, 'gi'),`<b>${expression}</b>`)}</span><span class='chn_sent'>${chn_examp}</span></li>`;
-                            }
-                            definition += '</ul>';
-                        }
-
-                        if (definition) {
-                            definitions.push(definition);
-                            defnum++;
-                        }
-                    }
-                }
+                audios[0] = posheader.querySelector(".uk.dpron-i source");
+                audios[0] = audios[0] ? 'https://dictionary.cambridge.org' + audios[0].getAttribute('src') : '';
+                //audios[0] = audios[0].replace('https', 'http');
+                audios[1] = posheader.querySelector(".us.dpron-i source");
+                audios[1] = audios[1] ? 'https://dictionary.cambridge.org' + audios[1].getAttribute('src') : '';
+                //audios[1] = audios[1].replace('https', 'http');
+//console.log( "cb_tc:findCambridge() audios: " + JSON.stringify(audios) );
             }
+
+            let posbody = entry.querySelector('.pos-body');
+            this.pushPosBody( expression, header, posbody, definitions );
 
             let css = this.renderCSS();
             notes.push({
@@ -137,6 +175,7 @@ console.log( "cb_tc:findCambridge() failed to fetch: " + url );
                 audios
             });
         }
+
         return notes;
     }
 
@@ -243,7 +282,10 @@ console.log( "cb_tc:findCambridge() failed to fetch: " + url );
             <style>
                 div.phrasehead{margin: 2px 0;font-weight: bold;}
                 span.star {color: #FFBB00;}
-                span.pos  {text-transform:lowercase; font-size:0.9em; margin-right:5px; padding:2px 4px; color:white; background-color:#0d47a1; border-radius:3px;}
+                span.posgram  {text-transform:lowercase; font-size:0.9em; margin-right:5px; padding:2px 4px; color:white; background-color:#0d47a1; border-radius:3px;}
+                span.dvar {color: orange;}
+                span.dsense_h {color: purple;};
+                span.def-info {color: orange;}
                 span.tran {margin:0; padding:0;}
                 span.eng_tran {margin-right:3px; padding:0;}
                 span.chn_tran {color:#0d47a1;}
@@ -251,6 +293,7 @@ console.log( "cb_tc:findCambridge() failed to fetch: " + url );
                 li.sent  {margin:0; padding:0;}
                 span.eng_sent {margin-right:5px;}
                 span.chn_sent {color:#0d47a1;}
+                span.xref {color: orange;}
             </style>`;
         return css;
     }
