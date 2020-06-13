@@ -148,9 +148,10 @@ console.log( "cb_tc:findCambridge() failed to fetch: " + url );
 
             if (posheader) {
                 let posgram = T(posheader.querySelector('.posgram'));
+                let lab = T(posheader.querySelector('.lab'));
                 let dvar = T(posheader.querySelector('.dvar'));
 
-                if (posgram) header += `<span class='posgram'>${posgram}</span><br>`;
+                if (posgram) header += `<span class='posgram'>${posgram}</span>${lab}<br>`;
                 if (dvar) header += `<span class='dvar'>${dvar}</span><br>`;
 
                 audios[0] = posheader.querySelector(".uk.dpron-i source");
